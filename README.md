@@ -8,6 +8,7 @@ What you need
 How you use it
 --------------
 * Create a configuration file called `config.py` in the same directory as this code, here's an example:
+
         #!/usr/bin/env python
         
         # Configuration file for mw-pdf-upload
