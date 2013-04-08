@@ -1,1 +1,3 @@
 wikitools==1.1.1
+simplejson
+poster

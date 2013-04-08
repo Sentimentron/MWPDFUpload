@@ -3,7 +3,7 @@
 import logging
 import os
 import shutil
-import suprocess
+import subprocess
 import sys
 import tempfile
 
@@ -16,9 +16,9 @@ from config import *
 def main():
 
 	# Connect to the site 
-	logging.debug("Connecting to site: '%s'", URL)
+	logging.info("Connecting to site: '%s'", URL)
 	wiki = Wiki(URL)
-	logging.debug("Logging in...")
+	logging.info("Logging in...")
 	if not wiki.login(USER, PASS):
 		logging.critical("Authentication failed, check your details!")
 		sys.exit(1)
@@ -29,12 +29,12 @@ def main():
 
 	for line in sys.stdin:
 		# Read in the filename and categories
-		fname, junk, categories = line.partition("\t")
+		fname, junk, categories = line.partition(" ")
 		categories = map(lambda x: "[[Category:%s]]" % x, categories.split(" "))
 
 		# Check the file is there
 		if not os.path.exists(fname):
-			logging.critical("Can't file file: %s", fname)
+			logging.critical("Can't find file: %s", fname)
 			sys.exit(1)
 		if fname[-4:] != ".pdf":
 			logging.critical("Can't interpret that file format: %s", fname)
@@ -51,7 +51,7 @@ def main():
 			logging.info("Categories:%s",categories)
 			
 			logging.info("\nConverting...")
-			args = ["-o %s/%%d.png" % (tmp_path), fname]
+			args = ["-o%s/%%d.png" % (tmp_path), os.path.join(os.getcwd(),fname)]
 			logging.debug("Calling '%s' with args '%s'", MUPDF, args)
 			subprocess.check_call([MUPDF]+args)
 			logging.info("\nUploading...")
@@ -61,7 +61,7 @@ def main():
 				file_description = "\n".join(categories) + "\n[[Category:MWPDFUpload]]"
 				file_name = fname + png_fname
 
-				fp_obj = open(png_fname, 'r')
+				fp_obj = open(os.path.join(tmp_path, png_fname), 'r')
 
 				# Create the Wikimedia file entry 
 				wiki_file = File(wiki, file_name)
@@ -93,5 +93,5 @@ def main():
 
 
 if __name__ == "__main__":
-	logging.basicConfig(loglevel=DEBUG)
+	logging.basicConfig(level=logging.DEBUG)
 	main()
