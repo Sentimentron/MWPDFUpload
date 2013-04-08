@@ -7,7 +7,7 @@ What you need
 
 How you use it
 --------------
-# Create a configuration file called `config.py` in the same directory as this code, here's an example:
+* Create a configuration file called `config.py` in the same directory as this code, here's an example:
     #!/usr/bin/env python
     
     # Configuration file for mw-pdf-upload
@@ -20,10 +20,10 @@ How you use it
     PASS="xxxxxxx"
     MUPDF=HOME+"/mupdf-1.2-source/build/debug/mudraw"
 
-# Prep your input file, see (`example_input.txt` for an example). Each line consists of the name of the file you want 
+* Prep your input file, see (`example_input.txt` for an example). Each line consists of the name of the file you want 
   to upload (relative to the current directory), followed by a space, and then all the categories you want to put that
   document under. 
-# Run `cat input.txt | python main.py` to start the upload. 
+* Run `cat input.txt | python main.py` to start the upload. 
 
 What it should do
 -----------------
