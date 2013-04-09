@@ -2,6 +2,7 @@
 
 import logging
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -9,6 +10,10 @@ import tempfile
 
 from wikitools import Wiki, File, Page 
 from config import *
+
+def sortpng(filename):
+	numeric, dot, extension = filename.partition('.')
+	return int(numeric)
 
 # Upload the images under a [[Category:MWPDFUpload]] [user_categories] tag
 # Create a summary page with the page_name [[user_categories:1]]
@@ -26,6 +31,8 @@ def main():
 	# Temporary datastructures
 	pending_upload = []
 	pending_summary = []
+	warnings = []
+	no_delete = set([])
 
 	for line in sys.stdin:
 		# Read in the filename and categories
@@ -58,19 +65,21 @@ def main():
 			subprocess.check_call([MUPDF]+args)
 			logging.info("\nUploading...")
 
-			for png_fname in os.listdir(tmp_path):
+			for png_fname in sorted(os.listdir(tmp_path), key = sortpng):
 				logging.info("\tUploading %s...", png_fname)
 				file_description = "\n".join(categories) + "\n[[Category:MWPDFUpload]]"
-				file_name = fname + png_fname
-
 				fp_obj = open(os.path.join(tmp_path, png_fname), 'r')
+				file_name = re.sub("[^a-zA-Z0-9]","-",fname) + png_fname
 
 				# Create the Wikimedia file entry 
-				wiki_file = File(wiki, file_name)
+				wiki_file = File(wiki, file_name, True, True)
 				wiki_file.upload(fp_obj)
 				if not wiki_file.exists:
-					raise Exception("For some reason, the file doesn't exist!")
-
+					logging.error("Wiki file '%s' doesn't exist!",wiki_file.title)
+					warnings.append((os.path.join(tmp_path, png_fname), wiki_file.title))
+					no_delete.add(tmp_path)
+					
+				logging.info("\tUploaded as %s",wiki_file.title)
 				pending_summary.append(wiki_file.title)
 
 			logging.info("=========================")
@@ -87,11 +96,16 @@ def main():
 		logging.info("=========================")
 		logging.info("Cleaning up...")
 		for fname, categories, tmp_path in pending_upload:
-			logging.info("Deleting temp directory '%s'...", tmp_path)
-			shutil.rmtree(tmp_path)
+			if tmp_path not in no_delete:
+				logging.info("Deleting temp directory '%s'...", tmp_path)
+				shutil.rmtree(tmp_path)
 
 		logging.info("Logging out...")
 		wiki.logout()
+		if len(warnings) > 0:
+			print >> sys.stderr, "The following files didn't upload:"
+			for fname, title in warnings:
+				print >> sys.stderr, "\t", fname, title
 
 
 if __name__ == "__main__":
