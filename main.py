@@ -46,6 +46,7 @@ def main():
 
 	try:
 		for fname, categories, tmp_path in pending_upload:
+			pending_summary = []
 			logging.info("=========================")
 			logging.info("Filename: %s", fname)
 			logging.info("Categories:%s",categories)
@@ -71,15 +72,15 @@ def main():
 
 				pending_summary.append(wiki_file.title)
 
-		logging.info("=========================")
-		logging.info("Generating summary page...")
+			logging.info("=========================")
+			logging.info("Generating summary page...")
 
-		page_template = "[[File:%s|thumb|center]]"
-		page_content = '\n'.join(page_template % (i,) for i in pending_summary)
-		page = Page(wiki, fname)
-		page.edit(text=page_content, summary="Automatic summary by MWPDFUpload", bot=True, watch=True)
-		if not page.exists:
-			raise Exception("For some reason, creating the summary page failed.")
+			page_template = "[[%s|frame|center]]"
+			page_content = '\n'.join(page_template % (i,) for i in pending_summary)
+			page = Page(wiki, fname)
+			page.edit(text=page_content, summary="Automatic summary by MWPDFUpload", bot=True, watch=True)
+			if not page.exists:
+				raise Exception("For some reason, creating the summary page failed.")
 
 	finally:
 		logging.info("=========================")
