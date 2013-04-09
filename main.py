@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tempfile
 
+import pyPdf
 from wikitools import Wiki, File, Page 
 from config import *
 
@@ -64,12 +65,16 @@ def main():
 			logging.debug("Calling '%s' with args '%s'", MUPDF, args)
 			subprocess.check_call([MUPDF]+args)
 			logging.info("\nUploading...")
+			pdf_file = pyPdf.PdfFileReader(file(fname, "rb"))
 
 			for png_fname in sorted(os.listdir(tmp_path), key = sortpng):
+				counter = sortpng(png_fname)
 				logging.info("\tUploading %s...", png_fname)
 				file_description = "\n".join(categories) + "\n[[Category:MWPDFUpload]]"
+				fp_path = os.path.join(tmp_path, png_fname)
 				fp_obj = open(os.path.join(tmp_path, png_fname), 'r')
-				file_name = re.sub("[^a-zA-Z0-9]","-",fname) + png_fname
+				file_root = re.sub("[^a-zA-Z0-9]","-",fname) 
+				file_name = file_root + str(counter) + ".png"
 
 				# Create the Wikimedia file entry 
 				wiki_file = File(wiki, file_name, True, True)
@@ -80,6 +85,20 @@ def main():
 					no_delete.add(tmp_path)
 					
 				logging.info("\tUploaded as %s",wiki_file.title)
+				
+				# Create a node page 
+				node_page = Page(wiki, file_name)
+				node_content = "<table class=\"wikitable\"><tr><td>"
+				if counter > 1:
+					node_content += "[[%s |Previous Slide ]] </td>"  % (file_root + str((counter-1)) + ".png",)
+				node_content += "<td>[[%s | Next Slide]]</tr></table>" % (file_root + str((counter+1)) + ".png")
+
+				node_content +=  "[[%s|frame|center]]" % (wiki_file.title)
+				# Extract the page's content from the PDF
+				node_content += " ".join(pdf_file.getPage(counter-1).extractText().strip().split()).encode("ascii","ignore")
+				node_content += "\n".join(categories)
+				node_page.edit(text=node_content, summary = "Automatic node page by MWPDFUpload")
+				
 				pending_summary.append(wiki_file.title)
 
 			logging.info("=========================")
