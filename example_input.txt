@@ -1,2 +1,2 @@
 test.pdf Testing
-test-with_a-2awkwardname.pdf AwkwardNames Testing
+test-with_a-2awkwardname.pdf AwkwardNames Testing Akward_Categories

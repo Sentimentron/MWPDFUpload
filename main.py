@@ -30,7 +30,8 @@ def main():
 	for line in sys.stdin:
 		# Read in the filename and categories
 		fname, junk, categories = line.partition(" ")
-		categories = map(lambda x: "[[Category:%s]]" % x, categories.split(" "))
+		categories = map(lambda x: "[[Category:%s]]" % x, categories.strip().split(" "))
+		categories.append("[[Category:MWPDFUploads]]")
 
 		# Check the file is there
 		if not os.path.exists(fname):
@@ -76,7 +77,7 @@ def main():
 			logging.info("Generating summary page...")
 
 			page_template = "[[%s|frame|center]]"
-			page_content = '\n'.join(page_template % (i,) for i in pending_summary)
+			page_content = '\n'.join(page_template % (i,) for i in pending_summary) + '\n'.join(categories)
 			page = Page(wiki, fname)
 			page.edit(text=page_content, summary="Automatic summary by MWPDFUpload", bot=True, watch=True)
 			if not page.exists:
