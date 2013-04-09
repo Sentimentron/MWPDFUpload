@@ -7,7 +7,7 @@ import subprocess
 import sys
 import tempfile
 
-from wikitools import Wiki, File 
+from wikitools import Wiki, File, Page 
 from config import *
 
 # Upload the images under a [[Category:MWPDFUpload]] [user_categories] tag
