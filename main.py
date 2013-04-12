@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-
+# -*- coding: utf-8 -*-
 import logging
 import os
 import re
@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tempfile
 
+from subprocess import PIPE
 import pyPdf
 from wikitools import Wiki, File, Page 
 from config import *
@@ -67,6 +68,10 @@ def main():
 			logging.info("\nUploading...")
 			pdf_file = pyPdf.PdfFileReader(file(fname, "rb"))
 
+			last_png_fname = None
+			for png_fname in sorted(os.listdir(tmp_path), key = sortpng):
+				last_png_fname = png_fname
+
 			for png_fname in sorted(os.listdir(tmp_path), key = sortpng):
 				counter = sortpng(png_fname)
 				logging.info("\tUploading %s...", png_fname)
@@ -88,16 +93,30 @@ def main():
 				
 				# Create a node page 
 				node_page = Page(wiki, file_name)
-				node_content = "<table class=\"wikitable\"><tr><td>"
+				node_content = "<center><table class=\"wikitable\"><tr>"
 				if counter > 1:
-					node_content += "[[%s |Previous Slide ]] </td>"  % (file_root + str((counter-1)) + ".png",)
-				node_content += "<td>[[%s | Next Slide]]</tr></table>" % (file_root + str((counter+1)) + ".png")
+					node_content += "<td>[[%s |« Previous page]] </td>"  % (file_root + str((counter-1)) + ".png",)
+				else:
+					node_content += "<td>'''(First page)'''</td>"
+				if png_fname == last_png_fname:
+					node_content += "<td>'''(Last page)'''</td>"
+				else:
+					node_content += "<td>[[%s |Next page »]]" % (file_root + str((counter+1)) + ".png", ) + "</td>"
 
-				node_content +=  "[[%s|frame|center]]" % (wiki_file.title)
+				node_content += "</tr>\n<tr><td colspan=\"2\">"
+				node_content +=  "[[%s|500px]]" % (wiki_file.title)
+				node_content += "</tr></table></center>\n\n"
+
 				# Extract the page's content from the PDF
-				node_content += " ".join(pdf_file.getPage(counter-1).extractText().strip().split()).encode("ascii","ignore")
+				extract = "pdf2txt.py -p %d -t text %s" % (counter, fname)
+				logging.debug("Extracting with args: %s",extract)
+				p = subprocess.Popen(extract, shell=True, stdout=PIPE)
+				p_stdout, p_stderr = p.communicate()
+				logging.error(p_stderr)
+				node_content += p_stdout.decode("utf-8").encode("ascii","xmlcharrefreplace") + "\n"
 				node_content += "\n".join(categories)
-				node_page.edit(text=node_content, summary = "Automatic node page by MWPDFUpload")
+				print node_content
+				node_page.edit(text=node_content, summary = "Automatic node page by MWPDFUpload", skipmd5=True, bot=True)
 				
 				pending_summary.append(wiki_file.title)
 
