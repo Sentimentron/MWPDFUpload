@@ -4,18 +4,31 @@ import logging
 import os
 import re
 import shutil
+import shlex
 import subprocess
 import sys
 import tempfile
 
 from subprocess import PIPE
-import pyPdf
 from wikitools import Wiki, File, Page 
 from config import *
 
 def sortpng(filename):
 	numeric, dot, extension = filename.partition('.')
 	return int(numeric)
+
+def _get_fname_cat_tuple_quoted(line):
+	items = shlex.split(line)
+	return items[0], ' '.join(items[1:])
+
+def _get_fname_cat_tuple(line):
+	fname, junk, categories = line.partition(" ")
+	return fname, categories
+
+def get_fname_cat_tuple(line):
+	if "\"" in line:
+		return _get_fname_cat_tuple_quoted(line)
+	return _get_fname_cat_tuple(line)
 
 # Upload the images under a [[Category:MWPDFUpload]] [user_categories] tag
 # Create a summary page with the page_name [[user_categories:1]]
@@ -38,7 +51,7 @@ def main():
 
 	for line in sys.stdin:
 		# Read in the filename and categories
-		fname, junk, categories = line.partition(" ")
+		fname, categories = get_fname_cat_tuple(line)
 		categories = map(lambda x: "[[Category:%s]]" % x, categories.strip().split(" "))
 		categories.append("[[Category:MWPDFUploads]]")
 
@@ -66,7 +79,6 @@ def main():
 			logging.debug("Calling '%s' with args '%s'", MUPDF, args)
 			subprocess.check_call([MUPDF]+args)
 			logging.info("\nUploading...")
-			pdf_file = pyPdf.PdfFileReader(file(fname, "rb"))
 
 			last_png_fname = None
 			for png_fname in sorted(os.listdir(tmp_path), key = sortpng):
@@ -81,54 +93,47 @@ def main():
 				file_root = re.sub("[^a-zA-Z0-9]","-",fname) 
 				file_name = file_root + str(counter) + ".png"
 
-				# Create the Wikimedia file entry 
-				wiki_file = File(wiki, file_name, True, True)
-				wiki_file.upload(fp_obj)
-				if not wiki_file.exists:
-					logging.error("Wiki file '%s' doesn't exist!",wiki_file.title)
-					warnings.append((os.path.join(tmp_path, png_fname), wiki_file.title))
-					no_delete.add(tmp_path)
-					
-				logging.info("\tUploaded as %s",wiki_file.title)
-				
-				# Create a node page 
-				node_page = Page(wiki, file_name)
-				node_content = "<center><table class=\"wikitable\"><tr>"
-				if counter > 1:
-					node_content += "<td>[[%s |« Previous page]] </td>"  % (file_root + str((counter-1)) + ".png",)
-				else:
-					node_content += "<td>'''(First page)'''</td>"
-				if png_fname == last_png_fname:
-					node_content += "<td>'''(Last page)'''</td>"
-				else:
-					node_content += "<td>[[%s |Next page »]]" % (file_root + str((counter+1)) + ".png", ) + "</td>"
+				if "--skipfile" not in sys.argv:
+					# Create the Wikimedia file entry 
+					wiki_file = File(wiki, file_name, True, True)
+					wiki_file.upload(fp_obj)
+					if not wiki_file.exists:
+						logging.error("Wiki file '%s' doesn't exist!",wiki_file.title)
+						warnings.append((os.path.join(tmp_path, png_fname), wiki_file.title))
+						no_delete.add(tmp_path)
+						
+					logging.info("\tUploaded as %s",wiki_file.title)
+			
+				if "--skipnode" not in sys.argv:	
+					# Create a node page 
+					node_page = Page(wiki, file_name)
+					node_content = "<center><table class=\"wikitable\"><tr>"
+					if counter > 1:
+						node_content += "<td>[[%s |« Previous page]] </td>"  % (file_root + str((counter-1)) + ".png",)
+					else:
+						node_content += "<td>'''(First page)'''</td>"
+					if png_fname == last_png_fname:
+						node_content += "<td>'''(Last page)'''</td>"
+					else:
+						node_content += "<td>[[%s |Next page »]]" % (file_root + str((counter+1)) + ".png", ) + "</td>"
 
-				node_content += "</tr>\n<tr><td colspan=\"2\">"
-				node_content +=  "[[%s|500px]]" % (wiki_file.title)
-				node_content += "</tr></table></center>\n\n"
+					node_content += "</tr>\n<tr><td colspan=\"2\">"
+					node_content +=  "[[%s|500px]]" % (wiki_file.title)
+					node_content += "</tr></table></center>\n\n"
 
-				# Extract the page's content from the PDF
-				extract = "pdf2txt.py -p %d -t text %s" % (counter, fname)
-				logging.debug("Extracting with args: %s",extract)
-				p = subprocess.Popen(extract, shell=True, stdout=PIPE)
-				p_stdout, p_stderr = p.communicate()
-				logging.error(p_stderr)
-				node_content += p_stdout.decode("utf-8").encode("ascii","xmlcharrefreplace") + "\n"
-				node_content += "\n".join(categories)
-				print node_content
-				node_page.edit(text=node_content, summary = "Automatic node page by MWPDFUpload", skipmd5=True, bot=True)
+					# Extract the page's content from the PDF
+					extract = "pdf2txt -p %d -t text \"%s\"" % (counter, fname)
+					logging.debug("Extracting with args: %s",extract)
+					p = subprocess.Popen(extract, shell=True, stdout=PIPE)
+					p_stdout, p_stderr = p.communicate()
+					logging.error(p_stderr)
+					node_content += p_stdout.decode("utf-8").encode("ascii","xmlcharrefreplace") + "\n"
+					node_content += "\n".join(categories)
+					print node_content
+					node_page.edit(text=node_content, summary = "Automatic node page by MWPDFUpload", skipmd5=True, bot=True)
 				
 				pending_summary.append(wiki_file.title)
 
-			logging.info("=========================")
-			logging.info("Generating summary page...")
-
-			page_template = "[[%s|frame|center]]"
-			page_content = '\n'.join(page_template % (i,) for i in pending_summary) + '\n'.join(categories)
-			page = Page(wiki, fname)
-			page.edit(text=page_content, summary="Automatic summary by MWPDFUpload", bot=True, watch=True)
-			if not page.exists:
-				raise Exception("For some reason, creating the summary page failed.")
 
 	finally:
 		logging.info("=========================")
