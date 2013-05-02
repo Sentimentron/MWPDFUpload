@@ -93,45 +93,44 @@ def main():
 				file_root = re.sub("[^a-zA-Z0-9]","-",fname) 
 				file_name = file_root + str(counter) + ".png"
 
+				# Create the Wikimedia file entry 
+				wiki_file = File(wiki, file_name, True, True)
 				if "--skipfile" not in sys.argv:
-					# Create the Wikimedia file entry 
-					wiki_file = File(wiki, file_name, True, True)
 					wiki_file.upload(fp_obj)
-					if not wiki_file.exists:
-						logging.error("Wiki file '%s' doesn't exist!",wiki_file.title)
-						warnings.append((os.path.join(tmp_path, png_fname), wiki_file.title))
-						no_delete.add(tmp_path)
-						
-					logging.info("\tUploaded as %s",wiki_file.title)
+				if not wiki_file.exists:
+					logging.error("Wiki file '%s' doesn't exist!",wiki_file.title)
+					warnings.append((os.path.join(tmp_path, png_fname), wiki_file.title))
+					no_delete.add(tmp_path)
+					
+				logging.info("\tUploaded as %s",wiki_file.title)
 			
-				if "--skipnode" not in sys.argv:	
-					# Create a node page 
-					node_page = Page(wiki, file_name)
-					node_content = "<center><table class=\"wikitable\"><tr>"
-					if counter > 1:
-						node_content += "<td>[[%s |« Previous page]] </td>"  % (file_root + str((counter-1)) + ".png",)
-					else:
-						node_content += "<td>'''(First page)'''</td>"
-					if png_fname == last_png_fname:
-						node_content += "<td>'''(Last page)'''</td>"
-					else:
-						node_content += "<td>[[%s |Next page »]]" % (file_root + str((counter+1)) + ".png", ) + "</td>"
+				# Create a node page 
+				node_page = Page(wiki, file_name)
+				node_content = "<center><table class=\"wikitable\"><tr>"
+				if counter > 1:
+					node_content += "<td>[[%s |« Previous page]] </td>"  % (file_root + str((counter-1)) + ".png",)
+				else:
+					node_content += "<td>'''(First page)'''</td>"
+				if png_fname == last_png_fname:
+					node_content += "<td>'''(Last page)'''</td>"
+				else:
+					node_content += "<td>[[%s |Next page »]]" % (file_root + str((counter+1)) + ".png", ) + "</td>"
 
-					node_content += "</tr>\n<tr><td colspan=\"2\">"
-					node_content +=  "[[%s|500px]]" % (wiki_file.title)
-					node_content += "</tr></table></center>\n\n"
+				node_content += "</tr>\n<tr><td colspan=\"2\">"
+				node_content +=  "[[%s|500px]]" % (wiki_file.title)
+				node_content += "</tr></table></center>\n\n"
 
-					# Extract the page's content from the PDF
-					extract = "pdf2txt -p %d -t text \"%s\"" % (counter, fname)
-					logging.debug("Extracting with args: %s",extract)
-					p = subprocess.Popen(extract, shell=True, stdout=PIPE)
-					p_stdout, p_stderr = p.communicate()
-					logging.error(p_stderr)
-					node_content += p_stdout.decode("utf-8").encode("ascii","xmlcharrefreplace") + "\n"
-					node_content += "\n".join(categories)
-					print node_content
-					node_page.edit(text=node_content, summary = "Automatic node page by MWPDFUpload", skipmd5=True, bot=True)
-				
+				# Extract the page's content from the PDF
+				extract = "pdf2txt -p %d -t text \"%s\"" % (counter, fname)
+				logging.debug("Extracting with args: %s",extract)
+				p = subprocess.Popen(extract, shell=True, stdout=PIPE)
+				p_stdout, p_stderr = p.communicate()
+				logging.error(p_stderr)
+				node_content += p_stdout.decode("utf-8").encode("ascii","xmlcharrefreplace") + "\n"
+				node_content += "\n".join(categories)
+				print node_content
+				node_page.edit(text=node_content, summary = "Automatic node page by MWPDFUpload", skipmd5=True, bot=True)
+			
 				pending_summary.append(wiki_file.title)
 
 
