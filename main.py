@@ -149,7 +149,8 @@ def main():
         node_content +=  "[[%s|500px]]" % (wiki_file.title)
         node_content += "</tr><tr><td>''%d'' of ''%d''</td>" % (page_no+1, number_of_pages+1)
         if uploadorig:
-          node_content += "<td>[[File:%s|Original]]</td>" % (wiki_orgfile.title,)
+          junk, junk, flink = wiki_orgfile.title.partition(":")
+          node_content += "<td>[[media:%s|Original]]</td>" % (flink,)
         else:
           node_content += "<td />"
         node_content += "</tr></table></center>\n\n"
