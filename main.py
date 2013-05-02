@@ -10,7 +10,7 @@ import sys
 import tempfile
 
 from subprocess import PIPE
-from wikitools import Wiki, File, Page 
+from wikitools import Wiki, File, Page, APIError
 from config import *
 
 def sortpng(filename):
@@ -88,6 +88,18 @@ def main():
       logging.info("=========================")
       logging.info("Filename: %s", fname)
       logging.info("Categories:%s",categories)
+
+      logging.info("\nUploading original...")
+      fhandle = open(fname,'r')      
+      wiki_orgfile = File(wiki, fname, True, True)
+      try:
+        wiki_orgfile.upload(fhandle)
+        uploadorig = wiki_orgfile.exists
+      except APIError:
+        uploadorig = False
+      finally:
+        fhandle.close()
+      uploadorig = wiki_orgfile.exists
       
       logging.info("\nConverting...")
       args = ["-o%s/%%d.png" % (tmp_path), os.path.join(os.getcwd(),fname)]
@@ -96,10 +108,12 @@ def main():
       logging.info("\nUploading...")
 
       last_png_fname = None
-      for png_fname in sorted(os.listdir(tmp_path), key = sortpng):
+      number_of_pages = 0
+      for c, png_fname in enumerate(sorted(os.listdir(tmp_path), key = sortpng)):
         last_png_fname = png_fname
+        number_of_pages = c
 
-      for png_fname in sorted(os.listdir(tmp_path), key = sortpng):
+      for page_no, png_fname in enumerate(sorted(os.listdir(tmp_path), key = sortpng)):
         counter = sortpng(png_fname)
         logging.info("\tUploading %s...", png_fname)
         file_description = "\n".join(categories) + "\n[[Category:MWPDFUpload]]"
@@ -133,6 +147,11 @@ def main():
 
         node_content += "</tr>\n<tr><td colspan=\"2\">"
         node_content +=  "[[%s|500px]]" % (wiki_file.title)
+        node_content += "</tr><tr><td>''%d'' of ''%d''</td>" % (page_no+1, number_of_pages+1)
+        if uploadorig:
+          node_content += "<td>[[File:%s|Original]]</td>" % (wiki_orgfile.title,)
+        else:
+          node_content += "<td />"
         node_content += "</tr></table></center>\n\n"
 
         # Extract the page's content from the PDF
@@ -142,7 +161,7 @@ def main():
           p = subprocess.Popen(extract, shell=True, stdout=PIPE)
           p_stdout, p_stderr = p.communicate()
           logging.error(p_stderr)
-          node_content += p_stdout.decode("utf-8").encode("ascii","xmlcharrefreplace").replace("\n","\n\n") + "\n"
+          node_content += p_stdout.decode("utf-8").encode("ascii","xmlcharrefreplace").replace("\n","\n\n").replace("\n\n\n\n","\n\n") + "\n"
 
         node_content += "\n".join(categories)
         print node_content
